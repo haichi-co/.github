@@ -1,4 +1,4 @@
-**配置** (*haichi*) · Japanese · noun
+##### **配置** (*haichi*) · Japanese · noun
 
 *Deployment, placement, arrangement, allocation, stationing.*
 
