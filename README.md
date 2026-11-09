@@ -1,9 +1,18 @@
-##### **配置** (*haichi*) · Japanese · noun
 
-*Deployment, placement, arrangement, allocation, stationing.*
+Haichi.co is a work-in-progress AI agent deployment platform designed to be environment- and provider-agnostic, extensible, and self-hardening.
 
-From **配** (*hai*, to distribute or allocate) + **置** (*chi*, to place or position).
+## Etymology
 
-These meanings reflect Haichi's approach to AI agents: deploying them into operational environments, assigning them roles and responsibilities, allocating resources, and coordinating their work.
+<details open>
 
-**Not just deploying agents, but putting them where they belong.**
+<summary><strong>配置</strong> (<em>haichi</em>)</summary>
+  Japanese · noun
+  
+   _Deployment, placement, arrangement, allocation, stationing._  
+   _From **配** (*hai*, to distribute or allocate) + **置** (*chi*, to place or position)._
+
+</details>
+
+The name also has a more personal origin: *Haichi.co* sounds a little like *Hachikō*, the famous Japanese dog—and the namesake of my own Shih Tzu mutt, who is obviously the bestest dog ever. The original Hachikō comes in a close second.
+
+Unfortunately, `hachi.com`, `hachi.co`, `hachiko.app`, `hachi.io`, and seemingly every other short variation were already taken. So, *Haichi.co* it is!
