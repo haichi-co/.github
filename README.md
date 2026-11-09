@@ -13,6 +13,8 @@ Haichi.co is a work-in-progress AI agent deployment platform designed to be envi
 
 </details>
 
-The name also has a more personal origin: *Haichi.co* sounds a little like *Hachikō*, the famous Japanese dog—and the namesake of my own Shih Tzu mutt, who is obviously the bestest dog ever. The original Hachikō comes in a close second.
+*Haichi.co* is also a small play on *Hachiko*, who needs no introduction.
+
+I'm talking, of course, about my Shih Tzu mutt, not that obviously less impressive Akita Inu who's been living off that one single Richard Gere flick for decades. That was *Hachik***ō**, duh.
 
 Unfortunately, `hachi.com`, `hachi.co`, `hachiko.app`, `hachi.io`, and seemingly every other short variation were already taken. So, *Haichi.co* it is!
