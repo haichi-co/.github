@@ -2,11 +2,15 @@ Haichi.co is a work-in-progress AI agent deployment platform designed to be envi
 
 ## Etymology
 
-**配置** (*haichi*) · Japanese · noun
+<details open>
 
-*Deployment, placement, arrangement, allocation, stationing.*
+<summary><strong>配置</strong> (<em>haichi</em>)</summary>
+  Japanese · noun
+  
+   _Deployment, placement, arrangement, allocation, stationing._  
+   _From **配** (*hai*, to distribute or allocate) + **置** (*chi*, to place or position)._
 
-From **配** (*hai*, to distribute or allocate) + **置** (*chi*, to place or position).
+</details>
 
 These meanings reflect Haichi's approach to AI agents: deploying them into operational environments, assigning them roles and responsibilities, allocating resources, and coordinating their work.
 
