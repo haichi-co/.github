@@ -19,6 +19,12 @@ See the [organization profile](profile/README.md) for information about Haichi.
 
 For security, do not give persistent privileged self-hosted runners access to untrusted same-repository PR code merely because the workflow excludes forks.
 
+## Agent workflow
+
+[Issue lifecycle](skills/issue-lifecycle/SKILL.md) is a portable, GitHub-native skill for research, Decision sub-issues, hierarchical planning, and independently verifiable implementation. Its [task-readiness reference](skills/issue-lifecycle/references/task-readiness.md) helps produce actionable leaves for less-capable agents.
+
+Execution stops after one verified unit by default, or continues sequentially within an explicitly authorized issue scope (and beyond it only when expressly requested). This skill is **opt-in**: files under `skills/` are not inherited automatically by other GitHub repositories or agent hosts.
+
 ## Repository scaffolding
 
 [Baseline `.gitignore`](templates/base.gitignore) excludes Node dependencies, local `.env` files (while allowing `.env.example` and `.env.sample`), and common operating-system files. Copy it into a new repository's root as `.gitignore`, or incorporate it into repository provisioning.
