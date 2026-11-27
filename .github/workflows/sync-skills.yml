@@ -1,0 +1,80 @@
+name: Sync organization agent skills
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/issue-lifecycle/**'
+      - '.github/skill-sync.json'
+      - 'src/skill-sync.mjs'
+      - 'src/skill-sync.test.mjs'
+      - '.github/workflows/sync-skills.yml'
+  schedule:
+    - cron: '19 5 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Preview without creating commits or pull requests
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: haichi-skill-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # Remains dormant until a dedicated App is installed and configured.
+    if: vars.SKILL_SYNC_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out canonical skill files
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Validate sync engine
+        run: |
+          node --check src/skill-sync.mjs
+          node --test src/skill-sync.test.mjs
+
+      - name: Identify opted-in repositories
+        id: targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'repositories=%s\n' "$(node src/skill-sync.mjs --list-repositories)" >> "$GITHUB_OUTPUT"
+
+      - name: Mint repository-scoped GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.SKILL_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SKILL_SYNC_APP_PRIVATE_KEY }}
+          owner: haichi-co
+          repositories: ${{ steps.targets.outputs.repositories }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Synchronize managed skill files
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$DRY_RUN" == true ]]; then
+            node src/skill-sync.mjs --dry-run
+          else
+            node src/skill-sync.mjs
+          fi
