@@ -3,7 +3,7 @@ name: Sync organization agent skills
 on:
   pull_request:
     paths:
-      - 'skills/issue-lifecycle/**'
+      - 'skills/**'
       - '.github/skill-sync.json'
       - 'src/skill-sync.ts'
       - 'src/skill-sync.test.ts'
@@ -12,7 +12,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'skills/issue-lifecycle/**'
+      - 'skills/**'
       - '.github/skill-sync.json'
       - 'src/skill-sync.ts'
       - 'src/skill-sync.test.ts'
@@ -96,7 +96,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          repositories="$(node src/skill-sync.ts --discover-repositories)"
+          targets="$(node src/skill-sync.ts --discover-targets)"
+          repositories="$(SKILL_SYNC_TARGETS="$targets" node src/skill-sync.ts --target-repositories)"
+          printf 'targets=%s\n' "$targets" >> "$GITHUB_OUTPUT"
           printf 'repositories=%s\n' "$repositories" >> "$GITHUB_OUTPUT"
           if [[ -z "$repositories" ]]; then
             echo "No repositories enrolled; skipping write token and synchronization."
@@ -118,7 +120,7 @@ jobs:
         if: steps.targets.outputs.repositories != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          SKILL_SYNC_TARGET_REPOSITORIES: ${{ steps.targets.outputs.repositories }}
+          SKILL_SYNC_TARGETS: ${{ steps.targets.outputs.targets }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
         shell: bash
         run: |

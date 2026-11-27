@@ -1,12 +1,16 @@
 {
-  "schema": "haichi-skill-sync/v2",
+  "schema": "haichi-skill-sync/v3",
   "owner": "haichi-co",
-  "skill": "issue-lifecycle",
-  "source": "skills/issue-lifecycle",
-  "destination": ".agents/skills/issue-lifecycle",
-  "managed_files": [
-    "SKILL.md",
-    "references/task-readiness.md"
-  ],
-  "opt_in_topic": "haichi-skill-issue-lifecycle"
+  "skills": [
+    {
+      "skill": "issue-lifecycle",
+      "source": "skills/issue-lifecycle",
+      "destination": ".agents/skills/issue-lifecycle",
+      "managed_files": [
+        "SKILL.md",
+        "references/task-readiness.md"
+      ],
+      "opt_in_topic": "haichi-skill-issue-lifecycle"
+    }
+  ]
 }
