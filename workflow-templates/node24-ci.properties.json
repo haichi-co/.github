@@ -1,0 +1,11 @@
+{
+  "name": "Node 24 CI with self-hosted fallback",
+  "description": "Node.js 24 npm CI on self-hosted Linux, with GitHub-hosted fallback for jobs queued over 30 minutes.",
+  "iconName": "octicon cpu",
+  "categories": [
+    "JavaScript"
+  ],
+  "filePatterns": [
+    "package.json$"
+  ]
+}
