@@ -106,7 +106,7 @@ export async function discoverRepositories(api: Api, manifest: SkillSyncManifest
         Array.isArray(row.topics) && row.topics.every((topic: unknown) => typeof topic === 'string'),
         'Invalid repository identity or missing topic metadata');
       const [owner, name, extra] = row.full_name.split('/');
-      assert(!extra && owner === manifest.owner && SAFE_NAME.test(name),
+      assert(!extra && owner === manifest.owner && (name === '.github' || SAFE_NAME.test(name)),
         `Invalid repository name: ${row.full_name}`);
       if (name === '.github' || row.archived || row.disabled || !row.topics.includes(manifest.opt_in_topic)) continue;
       assert(!found.has(name), `Duplicate discovered repository: ${name}`);
