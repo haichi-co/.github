@@ -1,0 +1,33 @@
+name: Bug
+description: Report a defect or unexpected behavior.
+type: Bug
+body:
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What is happening?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reliable reproduction, if available.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Versions, operating system, deployment surface, and relevant configuration.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Logs, screenshots, error messages, or links. Remove secrets and personal data.
