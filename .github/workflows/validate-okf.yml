@@ -41,6 +41,49 @@ jobs:
       - name: Install scoped validator dependencies
         run: npm ci --prefix src/okf --ignore-scripts --no-audit --no-fund
 
+      - name: Check managed workflow dependency pins
+        working-directory: src/okf
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          import { isMap, isScalar, isSeq, parseDocument } from 'yaml';
+
+          const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+          const paths = execFileSync('git', ['ls-files', '-z', '--', '.github/workflows', 'workflow-templates'], { cwd: root, encoding: 'utf8' })
+            .split('\0').filter(path => /\.ya?ml$/.test(path));
+          function check(node, path, location) {
+            if (!isScalar(node) || typeof node.value !== 'string') throw new Error(`${path}: ${location} is not a literal uses reference`);
+            const ref = node.value;
+            if (ref.startsWith('./')) return; // Same-repository path, not a remote ref.
+            if (path === 'workflow-templates/node24-ci.yml' && location === 'jobs.checks.uses' &&
+                ref === 'haichi-co/.github/.github/workflows/node-ci.yml@main') return; // Decision #32 / conditional #33.
+            if (!/^[^/@\s]+\/[^/@\s]+(?:\/[^@\s]+)?@[0-9a-f]{40}$/.test(ref) || !/^v\d+\.\d+\.\d+$/.test(node.comment?.trim() ?? '')) {
+              throw new Error(`${path}: ${location} must use a full commit SHA with an upstream version comment: ${ref}`);
+            }
+          }
+          for (const path of paths) {
+            const doc = parseDocument(readFileSync(join(root, path), 'utf8'));
+            const jobs = doc.get('jobs', true);
+            if (doc.errors.length || !isMap(jobs)) throw new Error(`${path}: invalid workflow jobs`);
+            for (const { key, value: job } of jobs.items) {
+              if (!isScalar(key) || !isMap(job)) throw new Error(`${path}: invalid job`);
+              const location = `jobs.${key.value}`;
+              if (job.has('uses')) check(job.get('uses', true), path, `${location}.uses`);
+              if (!job.has('steps')) continue;
+              const steps = job.get('steps', true);
+              if (!isSeq(steps)) throw new Error(`${path}: ${location}.steps is not a sequence`);
+              steps.items.forEach((step, i) => {
+                if (!isMap(step)) throw new Error(`${path}: ${location}.steps[${i}] is not a mapping`);
+                if (step.has('uses')) check(step.get('uses', true), path, `${location}.steps[${i}].uses`);
+              });
+            }
+          }
+          console.log(`Checked dependency pins in ${paths.length} workflow files`);
+          JS
+
       - name: Test validator
         run: node --test src/okf/validate.test.mts
 

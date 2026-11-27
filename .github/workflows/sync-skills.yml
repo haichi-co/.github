@@ -42,12 +42,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
 
@@ -70,18 +70,18 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out canonical skill files
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
 
       - name: Mint read-only organization discovery token
         id: discovery-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           client-id: ${{ vars.SKILL_SYNC_APP_CLIENT_ID }}
           private-key: ${{ secrets.SKILL_SYNC_APP_PRIVATE_KEY }}
@@ -107,7 +107,7 @@ jobs:
       - name: Mint repository-scoped GitHub App token
         if: steps.targets.outputs.repositories != ''
         id: app-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           client-id: ${{ vars.SKILL_SYNC_APP_CLIENT_ID }}
           private-key: ${{ secrets.SKILL_SYNC_APP_PRIVATE_KEY }}

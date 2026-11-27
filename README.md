@@ -8,7 +8,7 @@ See the [organization profile](profile/README.md) for information about Haichi.
 
 [Node 24 CI](workflow-templates/node24-ci.yml) is a GitHub Actions starter workflow for npm projects. From a repository's **Actions → New workflow** page, select **Node 24 CI with self-hosted fallback** to copy it into `.github/workflows/`. This is a template, not a workflow that runs in this repository or automatically applies to other repositories.
 
-- **Shared CI implementation:** The template calls [`.github/workflows/node-ci.yml`](.github/workflows/node-ci.yml) using `@main`. That reusable workflow handles checkout, Node 24 setup, npm's seven-day release-age guard, installation, checks, and tests. Updating the shared workflow changes CI for all template consumers that still reference `@main`; pin a tag or commit for stricter reproducibility.
+- **Shared CI implementation:** The template calls [`.github/workflows/node-ci.yml`](.github/workflows/node-ci.yml) using `@main`. That reusable workflow handles checkout, Node 24 setup, npm's seven-day release-age guard, installation, checks, and tests. Updating the shared workflow changes CI for all template consumers that still reference `@main`; use an exact reviewed commit SHA for stricter reproducibility.
 - **Default runners:** `[self-hosted, linux]` (labels are case-insensitive, no architecture restriction).
 - **Override:** Set the repository variable `CI_RUNNERS` to JSON, for example `"ubuntu-latest"` or `["self-hosted","linux"]`.
 - **Fork pull requests:** Use GitHub-hosted runners regardless of the override, to avoid running fork code on persistent self-hosted machines.
@@ -18,6 +18,14 @@ See the [organization profile](profile/README.md) for information about Haichi.
 **Limitations:** A `workflow_dispatch` replacement does **not** satisfy a required `pull_request` status check for the canceled run. Do not select this template unchanged where the CI check is mandatory for merging PRs; that needs a separately validated status-reporting solution. The watchdog also consumes GitHub-hosted Actions minutes and depends on scheduled workflows remaining enabled. Runner dispatch/cancellation has small unavoidable races and requires repository Actions write permission for the scheduled watchdog.
 
 For security, do not give persistent privileged self-hosted runners access to untrusted same-repository PR code merely because the workflow excludes forks.
+
+## Dependency maintenance and versioning
+
+Managed workflows pin external Actions to full 40-character upstream commit SHAs, with the exact published version in a comment. The hosted validation check inspects the parsed workflow and template `uses` references for these pins and comments; the starter's shared reusable-workflow `@main` call is the deliberate exception. This check does not establish upstream authenticity by itself.
+
+Update dependencies in a reviewed PR: inspect the upstream release, its changes and compatibility/security implications; resolve its exact tag (peel annotated tags to the commit) in the canonical upstream repository and verify the full SHA. Change the reference and version comment together in every affected managed workflow. Run pin validation, relevant workflow and disposable-consumer checks, and OKF validation; review affected concept summaries and refresh their exact committed source blob pins. For the skill-sync workflow, verify the currently enrolled managed files and pending PRs are already reconciled before merging changes that trigger synchronization. Roll back a bad update with a reviewed revert or replacement using the previous verified SHA and matching comment, refreshing related knowledge pins and re-running checks. Do not substitute a mutable upstream tag.
+
+The repository does not have a unified release version. Copied workflow templates are snapshots in the consumer's own commit history; synced skills and necessary relative dependencies are versioned by their merged consumer sync PRs; shared informational OKF knowledge links to current `main` by default, with exact commit snapshots optional. Reusable workflow compatibility version tags are deferred until an actual external caller, imminent incompatible interface change or consumer rollback need warrants them. Any future compatibility promise applies only to that executable workflow surface: use a moving plain major tag for compatible fixes and immutable exact releases only if separately authorized. Do not publish releases for routine changes to knowledge, skills or templates.
 
 ## Agent workflow
 
