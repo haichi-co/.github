@@ -46,3 +46,5 @@ With synchronization enabled, the workflow first mints an organization-wide **re
 [Baseline `.gitignore`](templates/base.gitignore) excludes Node dependencies, local `.env` files (while allowing `.env.example` and `.env.sample`), and common operating-system files. Copy it into a new repository's root as `.gitignore`, or incorporate it into repository provisioning.
 
 GitHub does **not** automatically inherit `.gitignore` files from the organization's `.github` repository; this file is an opt-in starter, not an organization-wide enforced default.
+
+<!-- Disposable stale-source fixture for #18; do not merge. -->
