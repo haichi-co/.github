@@ -1,0 +1,55 @@
+name: Validate OKF knowledge
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'profile/**'
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'profile/**'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-okf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NPM_CONFIG_MIN_RELEASE_AGE: '7'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+
+      - name: Verify Node and npm release-age guard
+        shell: bash
+        run: |
+          node --version
+          npm --version
+          node -e 'if (process.versions.node.split(".")[0] !== "24") process.exit(1)'
+          npm config list --long | grep '^min-release-age = '
+          test "$(npm config get min-release-age)" = '7'
+
+      - name: Install scoped validator dependencies
+        run: npm ci --prefix src/okf --ignore-scripts --no-audit --no-fund
+
+      - name: Test validator
+        run: node --test src/okf/validate.test.mts
+
+      - name: Type-check validator (no emit)
+        run: ./src/okf/node_modules/.bin/tsc --noEmit --project src/okf/tsconfig.json
+
+      # Coverage and blob pins are repository policy, not generic OKF rules.
+      # After reviewing a changed source and its concept, find its committed
+      # blob ID with git ls-tree HEAD -- <source-path> and update its quoted pin.
+      # A matching pin is not evidence of semantic correctness.
+      - name: Validate committed knowledge and source references
+        run: node src/okf/validate.mts --repo .
