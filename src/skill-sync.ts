@@ -5,13 +5,13 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export type SkillSyncManifest = {
-  schema: 'haichi-skill-sync/v1';
+  schema: 'haichi-skill-sync/v2';
   owner: string;
   skill: string;
   source: string;
   destination: string;
   managed_files: string[];
-  repositories: string[];
+  opt_in_topic: string;
 };
 
 export type SyncStatus =
@@ -32,7 +32,7 @@ function assert(condition: unknown, message: string): asserts condition {
 export function validateManifest(raw: unknown): SkillSyncManifest {
   assert(raw && typeof raw === 'object' && !Array.isArray(raw), 'Invalid manifest');
   const value = raw as Record<string, unknown>;
-  assert(value.schema === 'haichi-skill-sync/v1', 'Unsupported manifest schema');
+  assert(value.schema === 'haichi-skill-sync/v2', 'Unsupported manifest schema');
   assert(typeof value.owner === 'string' && SAFE_NAME.test(value.owner), 'Invalid owner');
   assert(typeof value.skill === 'string' && SAFE_NAME.test(value.skill), 'Invalid skill');
   assert(value.source === `skills/${value.skill}`, 'Unexpected skill source');
@@ -45,15 +45,10 @@ export function validateManifest(raw: unknown): SkillSyncManifest {
     files.add(path);
   }
   assert(files.has('SKILL.md'), 'SKILL.md must be managed');
-  assert(Array.isArray(value.repositories) && value.repositories.length > 0, 'No opted-in repositories');
-  const repos = new Set<string>();
-  for (const fullName of value.repositories) {
-    assert(typeof fullName === 'string', 'Invalid repository name');
-    const [owner, name, extra] = fullName.split('/');
-    assert(!extra && owner === value.owner && SAFE_NAME.test(name) && name !== '.github', `Out-of-scope repository: ${fullName}`);
-    assert(!repos.has(fullName), `Duplicate repository: ${fullName}`);
-    repos.add(fullName);
-  }
+  assert(typeof value.opt_in_topic === 'string' &&
+    /^haichi-skill-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.opt_in_topic),
+    'Invalid opt-in topic');
+  assert(!Object.hasOwn(value, 'repositories'), 'Legacy repository list is not supported');
   return value as SkillSyncManifest;
 }
 
@@ -96,6 +91,43 @@ export class Api {
   }
 }
 
+/**
+ * A read-only installation token enumerates private and public org repositories.
+ * Repository topics are the explicit opt-in. Missing topic metadata fails closed.
+ */
+export async function discoverRepositories(api: Api, manifest: SkillSyncManifest): Promise<string[]> {
+  const found = new Set<string>();
+  for (let page = 1; page <= 1000; page++) {
+    const rows = await api.call('GET', `/orgs/${manifest.owner}/repos?type=all&per_page=100&page=${page}`);
+    assert(Array.isArray(rows) && rows.length <= 100, 'Incomplete or invalid organization repository listing');
+    for (const row of rows) {
+      assert(typeof row?.full_name === 'string' &&
+        row.owner?.login === manifest.owner &&
+        Array.isArray(row.topics) && row.topics.every((topic: unknown) => typeof topic === 'string'),
+        'Invalid repository identity or missing topic metadata');
+      const [owner, name, extra] = row.full_name.split('/');
+      assert(!extra && owner === manifest.owner && SAFE_NAME.test(name),
+        `Invalid repository name: ${row.full_name}`);
+      if (name === '.github' || row.archived || row.disabled || !row.topics.includes(manifest.opt_in_topic)) continue;
+      assert(!found.has(name), `Duplicate discovered repository: ${name}`);
+      found.add(name);
+    }
+    if (rows.length < 100) return [...found].sort();
+  }
+  throw new Error('Organization repository discovery exceeded the page limit');
+}
+
+/** Validate the exact discovery output before using a scoped write token. */
+export function parseDiscoveredTargets(csv: string | undefined, manifest: SkillSyncManifest): string[] {
+  assert(typeof csv === 'string' && csv.length > 0, 'Missing discovered repository targets');
+  const seen = new Set<string>();
+  return csv.split(',').map(name => {
+    assert(SAFE_NAME.test(name) && name !== '.github' && !seen.has(name), `Invalid discovered repository: ${name}`);
+    seen.add(name);
+    return `${manifest.owner}/${name}`;
+  });
+}
+
 function assertSafeBranch(branch: string) {
   assert(/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(branch) && !branch.includes('..'), 'Unsafe branch name');
 }
@@ -135,6 +167,7 @@ async function verifyManagedBranch(api: Api, repo: string, base: string, branch:
 export async function syncRepository(api: Api, repo: string, manifest: SkillSyncManifest, expected: ReadonlyMap<string, string>, dryRun = false): Promise<SyncResult> {
   const meta = await api.call('GET', `/repos/${repo}`);
   assert(meta.full_name === repo && meta.owner?.login === manifest.owner && !meta.archived && !meta.disabled, `${repo}: repository identity or state mismatch`);
+  assert(Array.isArray(meta.topics) && meta.topics.includes(manifest.opt_in_topic), `${repo}: repository is no longer opted in`);
   assert(typeof meta.default_branch === 'string' && meta.default_branch.length, `${repo}: missing default branch`);
   const base = meta.default_branch;
   assertSafeBranch(base);
@@ -207,14 +240,21 @@ export async function syncRepository(api: Api, repo: string, manifest: SkillSync
 
 async function main(): Promise<void> {
   const { manifest, content } = await loadConfig();
-  if (process.argv.includes('--list-repositories')) {
-    process.stdout.write(manifest.repositories.map(repo => repo.split('/')[1]).join(',') + '\n');
+  const args = process.argv.slice(2);
+  if (args.length === 1 && args[0] === '--validate-config') {
+    process.stdout.write('manifest_valid\n');
     return;
   }
-  assert(process.argv.every(arg => !arg.startsWith('--') || arg === '--dry-run'), 'Unknown argument');
+  if (args.length === 1 && args[0] === '--discover-repositories') {
+    const api = new Api(process.env.GH_TOKEN ?? '');
+    process.stdout.write((await discoverRepositories(api, manifest)).join(',') + '\n');
+    return;
+  }
+  assert(args.length === 0 || (args.length === 1 && args[0] === '--dry-run'), 'Unknown argument');
+  const repositories = parseDiscoveredTargets(process.env.SKILL_SYNC_TARGET_REPOSITORIES, manifest);
   const api = new Api(process.env.GH_TOKEN ?? '');
-  const dryRun = process.argv.includes('--dry-run');
-  for (const repo of manifest.repositories) {
+  const dryRun = args.includes('--dry-run');
+  for (const repo of repositories) {
     const result = await syncRepository(api, repo, manifest, content, dryRun);
     process.stdout.write(JSON.stringify(result) + '\n');
   }
