@@ -41,6 +41,22 @@ The workflow runs on a GitHub-hosted runner after relevant `main` updates (inclu
 
 With synchronization enabled, the workflow first mints an organization-wide **read-only** token to discover opted-in repository-skill pairs (including private repositories) from topics. It derives the unique repository union from that validated plan and mints a separate **read/write token restricted to those discovered repositories**; zero matches skips the writer token entirely. Before every write, the specific skill enrollment and repository identity are rechecked. Unexpected missing topic metadata or repository identity fails closed. Adding a repository to the organization-wide App installation alone does not enroll it. The workflow never executes target-repository code, and does not change repository-specific agent instructions or other workflows. Scheduled workflows in public repositories can be disabled by GitHub after extended inactivity; check their enabled status periodically.
 
+## Shared knowledge (OKF v0.3)
+
+The public [Haichi shared GitHub knowledge](https://github.com/haichi-co/.github/blob/main/knowledge/index.md) bundle describes the shared skills, workflows, onboarding and security resources. Its concepts link to the canonical source files rather than duplicating their instructions.
+
+To opt in, open the consuming repository's existing README or another owner-maintained documentation entry point and add this Markdown link once, through the repository's normal review process:
+
+```markdown
+[Haichi shared GitHub knowledge](https://github.com/haichi-co/.github/blob/main/knowledge/index.md)
+```
+
+Follow the index to the relevant concept and its canonical source. Reading it requires public GitHub access, not a GitHub App credential or an enrollment topic. This is deliberate human/agent discovery, not automatic discovery or installation by every agent host. If a link is unavailable, report that limitation and use a previously reviewed revision if available; do not invent guidance or implicitly execute fetched artifacts.
+
+Link to moving `main` by default to receive centrally reviewed corrections without updating the consumer. When an exact snapshot is needed, replace `main` in the link with the full commit SHA; resolve linked canonical sources at that same reviewed revision for strict historical reproduction. GitHub Releases are not required. Central source mappings and blob pins are validated in CI; a consumer need not install the validator, adopt OKF or change its own specification layout. Consumer-local OKF is independently optional (the generic validator is separate from this repository's coverage policy).
+
+Canonical executable or instruction sources govern their behavior; the consuming repository retains authority over its own requirements, instructions, knowledge and specifications. Skill sync remains independent: it copies actual opted-in skill files and necessary relative dependencies, not the shared knowledge bundle. To opt out of shared knowledge, remove only the link. No managed files, topics, workflows or unrelated local documentation need to change.
+
 ## Repository scaffolding
 
 [Baseline `.gitignore`](templates/base.gitignore) excludes Node dependencies, local `.env` files (while allowing `.env.example` and `.env.sample`), and common operating-system files. Copy it into a new repository's root as `.gitignore`, or incorporate it into repository provisioning.
