@@ -12,3 +12,9 @@ sources:
 # Repository bootstrap
 
 For adopting shared GitHub resources, consult the [canonical repository README](https://github.com/haichi-co/.github/blob/main/README.md) for onboarding guidance and the [baseline ignore-file scaffold](https://github.com/haichi-co/.github/blob/main/templates/base.gitignore) when relevant. Actual source artifacts govern executable behavior; active requirements and decisions remain in GitHub issues.
+
+## Key facts and constraints
+
+- Organization-level resources do not make every file an inherited default. The Node CI starter is copied into a consumer's workflows, skills are opt-in, and the baseline ignore-file scaffold must be copied or adopted explicitly; none of those resources applies automatically.
+- The baseline ignore file excludes `node_modules/`, local environment files and common operating-system artifacts, while allowing `.env.example` and `.env.sample`. It is a starter, not an enforced organization-wide policy.
+- The root README is the onboarding guide. Canonical workflow, skill and scaffold files govern their own behavior, and GitHub issues record active requirements and decisions.

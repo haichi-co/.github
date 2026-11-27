@@ -18,3 +18,10 @@ sources:
 # Skill synchronization
 
 For centrally managed, opt-in skill distribution, consult the [canonical manifest](https://github.com/haichi-co/.github/blob/main/.github/skill-sync.json) and [sync workflow](https://github.com/haichi-co/.github/blob/main/.github/workflows/sync-skills.yml). The [engine](https://github.com/haichi-co/.github/blob/main/src/skill-sync.ts) governs synchronization behavior; its tests and TypeScript configuration are verification resources.
+
+## Key facts and constraints
+
+- The v3 manifest defines each skill's source, destination, explicit managed files and unique enrollment topic. Repositories opt into each skill independently through that topic; installing the organization App alone does not enroll them.
+- When synchronization is enabled, discovery uses an organization-scoped read-only token; the writer token is restricted to the unique union of discovered target repositories. No targets means no writer token. The engine rechecks repository identity, enrollment and default branch before each write.
+- Synchronization creates or updates one reviewable PR per repository-skill pair, never auto-merges, and makes no writes when the default branch or pending PR already matches. Unexpected branch changes fail closed; only manifest-managed files are changed, without executing target code or modifying repository-specific agent instructions, unrelated skills or workflows.
+- Removing a topic stops updates for that skill without deleting its existing files or affecting other enrollments. When enabled, the hosted workflow reconciles on relevant main updates, daily at 05:19 UTC, or on manual dispatch, which defaults to a dry run.

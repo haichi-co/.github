@@ -10,3 +10,8 @@ sources:
 # Security reporting
 
 For vulnerability reporting, consult the [canonical security policy](https://github.com/haichi-co/.github/blob/main/SECURITY.md). The policy is authoritative for reporting instructions.
+
+## Key facts and constraints
+
+- Report security vulnerabilities via email to [contact@haichi.co](mailto:contact@haichi.co), the public contact specified in SECURITY.md.
+- The canonical policy does not specify a response SLA or additional disclosure procedure; do not infer either.
