@@ -8,6 +8,7 @@ See the [organization profile](profile/README.md) for information about Haichi.
 
 [Node 24 CI](workflow-templates/node24-ci.yml) is a GitHub Actions starter workflow for npm projects. From a repository's **Actions → New workflow** page, select **Node 24 CI with self-hosted fallback** to copy it into `.github/workflows/`. This is a template, not a workflow that runs in this repository or automatically applies to other repositories.
 
+- **Shared CI implementation:** The template calls [`.github/workflows/node-ci.yml`](.github/workflows/node-ci.yml) using `@main`. That reusable workflow handles checkout, Node 24 setup, npm's seven-day release-age guard, installation, checks, and tests. Updating the shared workflow changes CI for all template consumers that still reference `@main`; pin a tag or commit for stricter reproducibility.
 - **Default runners:** `[self-hosted, linux]` (labels are case-insensitive, no architecture restriction).
 - **Override:** Set the repository variable `CI_RUNNERS` to JSON, for example `"ubuntu-latest"` or `["self-hosted","linux"]`.
 - **Fork pull requests:** Use GitHub-hosted runners regardless of the override, to avoid running fork code on persistent self-hosted machines.
