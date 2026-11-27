@@ -25,6 +25,20 @@ For security, do not give persistent privileged self-hosted runners access to un
 
 Execution stops after one verified unit by default, or continues sequentially within an explicitly authorized issue scope (and beyond it only when expressly requested). This skill is **opt-in**: files under `skills/` are not inherited automatically by other GitHub repositories or agent hosts.
 
+## Agent skill synchronization
+
+The canonical [issue-lifecycle skill](skills/issue-lifecycle/SKILL.md) and its task-readiness reference can be distributed through [Sync organization agent skills](.github/workflows/sync-skills.yml). Only repositories explicitly listed in [`.github/skill-sync.json`](.github/skill-sync.json) are enrolled; the initial target is `haichi-co/gharp`. Add a repository to this manifest to opt it in. The synchronization preserves other skills and the target's `AGENTS.md`; only manifest-listed `.agents/skills/issue-lifecycle/` files are managed.
+
+The workflow runs on a GitHub-hosted runner after relevant `main` updates, daily at **05:19 UTC**, or by manual dispatch (which defaults to **dry-run**). For each enrolled repository, it compares the canonical files with the default branch and existing sync PR. If current, it makes **no writes**. Otherwise it creates or updates the dedicated `haichi-skill-sync/issue-lifecycle` branch and **one reviewable PR**, with read-back verification. A pending matching PR is reused; reruns do not create duplicate commits or PRs. Unexpected edits on the managed branch fail closed rather than overwriting them. Approved PRs are merged by the repository's normal process; the workflow never auto-merges.
+
+**Initial credential setup (not yet configured):** Create a dedicated GitHub App with **Contents: read/write** and **Pull requests: read/write** repository permissions, install it in `haichi-co` with access to the manifest-listed repositories, and configure these settings on the `.github` repository:
+
+- Actions variable `SKILL_SYNC_APP_CLIENT_ID`: the App's client ID.
+- Actions secret `SKILL_SYNC_APP_PRIVATE_KEY`: the App's private key (PEM).
+- Actions variable `SKILL_SYNC_ENABLED`: set to `true` **only after** the above are available.
+
+Until enabled, the workflow's sync job is skipped; no App installation, credential, or target-repository write is performed by adding these files. Tokens are minted just for the opted-in repository list and limited to the two requested permissions. An installation missing an enrolled repository produces an error rather than widening access. The workflow never executes target-repository code, and does not change repository-specific agent instructions or other workflows. Scheduled workflows in public repositories can be disabled by GitHub after extended inactivity; check their enabled status periodically.
+
 ## Repository scaffolding
 
 [Baseline `.gitignore`](templates/base.gitignore) excludes Node dependencies, local `.env` files (while allowing `.env.example` and `.env.sample`), and common operating-system files. Copy it into a new repository's root as `.gitignore`, or incorporate it into repository provisioning.
