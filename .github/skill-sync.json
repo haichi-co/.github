@@ -1,9 +1,12 @@
 {
-  "schema": "haichi-skill-sync/v1",
+  "schema": "haichi-skill-sync/v2",
   "owner": "haichi-co",
   "skill": "issue-lifecycle",
   "source": "skills/issue-lifecycle",
   "destination": ".agents/skills/issue-lifecycle",
-  "managed_files": ["SKILL.md", "references/task-readiness.md"],
-  "repositories": ["haichi-co/gharp"]
+  "managed_files": [
+    "SKILL.md",
+    "references/task-readiness.md"
+  ],
+  "opt_in_topic": "haichi-skill-issue-lifecycle"
 }

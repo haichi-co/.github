@@ -1,11 +1,11 @@
 import { strict as assert } from 'node:assert';
 import test from 'node:test';
-import { Api, isIdentical, loadConfig, syncRepository, validateManifest } from './skill-sync.ts';
+import { Api, discoverRepositories, isIdentical, loadConfig, parseDiscoveredTargets, syncRepository, validateManifest } from './skill-sync.ts';
 
 const manifest = validateManifest({
-  schema: 'haichi-skill-sync/v1', owner: 'haichi-co', skill: 'issue-lifecycle',
+  schema: 'haichi-skill-sync/v2', owner: 'haichi-co', skill: 'issue-lifecycle',
   source: 'skills/issue-lifecycle', destination: '.agents/skills/issue-lifecycle',
-  managed_files: ['SKILL.md', 'references/task-readiness.md'], repositories: ['haichi-co/gharp'],
+  managed_files: ['SKILL.md', 'references/task-readiness.md'], opt_in_topic: 'haichi-skill-issue-lifecycle',
 });
 const wanted = new Map([
   ['.agents/skills/issue-lifecycle/SKILL.md', 'skill v1\n'],
@@ -17,13 +17,14 @@ function fakeRepository(baseContent: Map<string, string> = new Map()) {
   const state: {
     main: Map<string, string>; branch: Map<string, string> | null; branchSha: string | null;
     prs: any[]; writes: any[]; tampered: boolean; staged: Map<string, string> | null;
-    unrelated?: boolean;
+    unrelated?: boolean; optedOut?: boolean;
   } = { main: new Map(baseContent), branch: null, branchSha: null, prs: [], writes: [], tampered: false, staged: null };
   const api = {
     async call(method: string, path: string, body?: any): Promise<any> {
       if (method !== 'GET') state.writes.push({ method, path, body });
       if (method === 'GET' && path === '/repos/haichi-co/gharp')
-        return { full_name: 'haichi-co/gharp', owner: { login: 'haichi-co' }, archived: false, default_branch: 'main' };
+        return { full_name: 'haichi-co/gharp', owner: { login: 'haichi-co' }, archived: false, default_branch: 'main',
+          topics: state.optedOut ? [] : [manifest.opt_in_topic] };
       if (method === 'GET' && path === '/repos/haichi-co/gharp/git/ref/heads/main') return { object: { sha: baseSha } };
       if (method === 'GET' && path === '/repos/haichi-co/gharp/git/ref/heads/haichi-skill-sync/issue-lifecycle')
         return state.branchSha ? { object: { sha: state.branchSha, type: 'commit' } } : null;
@@ -76,12 +77,56 @@ function fakeRepository(baseContent: Map<string, string> = new Map()) {
   return { api, state };
 }
 
-test('manifest enforces same-owner explicit opt-in and safe file paths', () => {
-  assert.equal(manifest.repositories[0], 'haichi-co/gharp');
-  assert.throws(() => validateManifest({ ...manifest, repositories: ['attention-spa/newsq'] }), /Out-of-scope/);
-  assert.throws(() => validateManifest({ ...manifest, repositories: ['haichi-co/gharp', 'haichi-co/gharp'] }), /Duplicate repository/);
+test('manifest enforces topic-based opt-in and safe file paths', () => {
+  assert.equal(manifest.opt_in_topic, 'haichi-skill-issue-lifecycle');
+  assert.throws(() => validateManifest({ ...manifest, repositories: ['haichi-co/gharp'] }), /Legacy repository list/);
+  assert.throws(() => validateManifest({ ...manifest, opt_in_topic: '*' }), /Invalid opt-in topic/);
   assert.throws(() => validateManifest({ ...manifest, managed_files: ['SKILL.md', '../AGENTS.md'] }), /Invalid file/);
   assert.throws(() => validateManifest({ ...manifest, destination: 'AGENTS.md' }), /destination/);
+});
+
+const repository = (name: string, topics: string[] = [], extra: Record<string, unknown> = {}) => ({
+  full_name: `haichi-co/${name}`, owner: { login: 'haichi-co' }, archived: false, disabled: false, topics, ...extra,
+});
+
+test('topic discovery excludes untagged, disabled, archived, and source repositories', async () => {
+  const paths: string[] = [];
+  const api = { async call(method: string, path: string): Promise<any> {
+    assert.equal(method, 'GET'); paths.push(path);
+    return [repository('runtime'), repository('gharp', [manifest.opt_in_topic]),
+      repository('disabled', [manifest.opt_in_topic], { disabled: true }),
+      repository('archived', [manifest.opt_in_topic], { archived: true }),
+      repository('.github', [manifest.opt_in_topic])];
+  } };
+  assert.deepEqual(await discoverRepositories(api as Api, manifest), ['gharp']);
+  assert.deepEqual(paths, ['/orgs/haichi-co/repos?type=all&per_page=100&page=1']);
+});
+
+test('topic discovery paginates without silently truncating organization repositories', async () => {
+  const paths: string[] = [];
+  const first = Array.from({ length: 100 }, (_, i) => repository(`repo-${i}`));
+  const api = { async call(method: string, path: string): Promise<any> {
+    paths.push(path);
+    return path.endsWith('page=1') ? first : [repository('gharp', [manifest.opt_in_topic])];
+  } };
+  assert.deepEqual(await discoverRepositories(api as Api, manifest), ['gharp']);
+  assert.equal(paths.length, 2);
+});
+
+test('discovery fails closed on malformed API responses', async () => {
+  const bad = { async call() { return [repository('gharp', [], { topics: undefined })]; } };
+  await assert.rejects(discoverRepositories(bad as unknown as Api, manifest), /missing topic metadata/);
+  const wrongOwner = { async call() { return [repository('gharp', [manifest.opt_in_topic], { owner: { login: 'other' } })]; } };
+  await assert.rejects(discoverRepositories(wrongOwner as unknown as Api, manifest), /Invalid repository identity/);
+  const wrongPage = { async call() { return { incomplete: true }; } };
+  await assert.rejects(discoverRepositories(wrongPage as unknown as Api, manifest), /Incomplete or invalid/);
+});
+
+test('scoped targets require the exact validated discovery output', () => {
+  assert.deepEqual(parseDiscoveredTargets('gharp,runtime', manifest), ['haichi-co/gharp', 'haichi-co/runtime']);
+  for (const csv of [undefined, '', '.github', 'gharp,gharp', '../repo', 'other/repo', 'gharp,']) {
+    assert.throws(() => parseDiscoveredTargets(csv, manifest), /Missing discovered|Invalid discovered/);
+  }
 });
 
 test('content comparison uses exact managed file equality', () => {
@@ -133,6 +178,13 @@ test('orphaned owned branch can be converted into a PR without a new commit', as
   assert.equal(state.prs.length, 1);
 });
 
+test('repository removed from topic enrollment fails before any writes', async () => {
+  const { api, state } = fakeRepository();
+  state.optedOut = true;
+  await assert.rejects(syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, wanted), /no longer opted in/);
+  assert.equal(state.writes.length, 0);
+});
+
 test('dry run never writes or creates PRs', async () => {
   const { api, state } = fakeRepository();
   const result = await syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, wanted, true);
@@ -156,7 +208,7 @@ test('unrelated or hand-edited sync branches fail closed', async () => {
 
 test('loadConfig reads the canonical on-disk files', async () => {
   const result = await loadConfig();
-  assert.equal(result.manifest.repositories[0], 'haichi-co/gharp');
+  assert.equal(result.manifest.opt_in_topic, 'haichi-skill-issue-lifecycle');
   // Source skill files are staged separately by the preflight setup.
   assert.ok(result.content.get('.agents/skills/issue-lifecycle/SKILL.md')?.includes('name: issue-lifecycle'));
 });

@@ -1,6 +1,14 @@
 name: Sync organization agent skills
 
 on:
+  pull_request:
+    paths:
+      - 'skills/issue-lifecycle/**'
+      - '.github/skill-sync.json'
+      - 'src/skill-sync.ts'
+      - 'src/skill-sync.test.ts'
+      - 'tsconfig.json'
+      - '.github/workflows/sync-skills.yml'
   push:
     branches: [main]
     paths:
@@ -52,12 +60,12 @@ jobs:
       - name: Validate manifest and sync engine
         run: |
           node --test src/skill-sync.test.ts
-          node src/skill-sync.ts --list-repositories
+          node src/skill-sync.ts --validate-config
 
   sync:
     needs: verify
     # Remains dormant until a dedicated App is installed and configured.
-    if: vars.SKILL_SYNC_ENABLED == 'true'
+    if: vars.SKILL_SYNC_ENABLED == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -71,14 +79,31 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Identify opted-in repositories
+      - name: Mint read-only organization discovery token
+        id: discovery-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.SKILL_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SKILL_SYNC_APP_PRIVATE_KEY }}
+          owner: haichi-co
+          permission-contents: read
+          permission-pull-requests: read
+
+      - name: Discover opted-in repositories
         id: targets
+        env:
+          GH_TOKEN: ${{ steps.discovery-token.outputs.token }}
         shell: bash
         run: |
           set -euo pipefail
-          printf 'repositories=%s\n' "$(node src/skill-sync.ts --list-repositories)" >> "$GITHUB_OUTPUT"
+          repositories="$(node src/skill-sync.ts --discover-repositories)"
+          printf 'repositories=%s\n' "$repositories" >> "$GITHUB_OUTPUT"
+          if [[ -z "$repositories" ]]; then
+            echo "No repositories enrolled; skipping write token and synchronization."
+          fi
 
       - name: Mint repository-scoped GitHub App token
+        if: steps.targets.outputs.repositories != ''
         id: app-token
         uses: actions/create-github-app-token@v3
         with:
@@ -90,8 +115,10 @@ jobs:
           permission-pull-requests: write
 
       - name: Synchronize managed skill files
+        if: steps.targets.outputs.repositories != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SKILL_SYNC_TARGET_REPOSITORIES: ${{ steps.targets.outputs.repositories }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
         shell: bash
         run: |
