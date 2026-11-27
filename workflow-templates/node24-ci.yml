@@ -1,5 +1,5 @@
 # Organization workflow template. Copy into .github/workflows/ in an npm repository.
-# Important: workflow_dispatch fallback runs do not satisfy required pull_request checks.
+# Invokes the shared Node CI workflow; fallback dispatches do not satisfy required PR checks.
 name: Node 24 CI
 run-name: ${{ github.event_name == 'workflow_dispatch' && inputs.source_run_id != '' && format('CI fallback for run {0}', inputs.source_run_id) || 'Node 24 CI' }}
 
@@ -33,28 +33,12 @@ permissions:
 
 jobs:
   checks:
-    name: Validate and test
+    name: Node CI
     if: github.event_name != 'schedule'
-    # Fork PRs use hosted runners to avoid executing untrusted forks on persistent hosts.
-    # Override the default runner using a repository variable such as '"ubuntu-latest"'.
-    runs-on: ${{ fromJSON((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository || github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted') && '"ubuntu-latest"' || (vars.CI_RUNNERS || '["self-hosted","linux"]')) }}
-    timeout-minutes: 30
-    env:
-      NPM_CONFIG_MIN_RELEASE_AGE: '7'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.source_sha || github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Verify npm release-age guard
-        run: test "$(npm config get min-release-age)" = '7'
-      - run: npm ci
-      - run: npm run check --if-present
-      - run: npm test --if-present
+    uses: haichi-co/.github/.github/workflows/node-ci.yml@main
+    with:
+      runners: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository || github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted') && '"ubuntu-latest"' || (vars.CI_RUNNERS || '["self-hosted","linux"]') }}
+      checkout_sha: ${{ inputs.source_sha || github.sha }}
 
   watchdog:
     name: Self-hosted queue watchdog
@@ -94,10 +78,11 @@ jobs:
               continue
             fi
 
+            # Reusable jobs are named like 'Node CI / Validate and test'.
             jobs="$(gh api "repos/$repo/actions/runs/$run_id/jobs?filter=latest&per_page=100")"
             # Never cancel a job that has started, awaits approval, or uses hosted runners.
             if ! jq -e --argjson cutoff "$cutoff" '
-                [.jobs[] | select(.name == "Validate and test")] as $matches
+                [.jobs[] | select(.name == "Validate and test" or (.name | endswith(" / Validate and test")))] as $matches
                 | ($matches | length) == 1
                   and $matches[0].status == "queued"
                   and $matches[0].started_at == null
@@ -117,7 +102,7 @@ jobs:
             fi
 
             # Recheck the individual job immediately before canceling, reducing races.
-            job_id="$(jq -r '.jobs[] | select(.name == "Validate and test") | .id' <<< "$jobs")"
+            job_id="$(jq -r '.jobs[] | select(.name == "Validate and test" or (.name | endswith(" / Validate and test"))) | .id' <<< "$jobs")"
             job_now="$(gh api "repos/$repo/actions/jobs/$job_id")"
             if [[ "$(jq -r '.status' <<< "$job_now")" != queued ]]; then
               echo "Skip run $run_id: job no longer queued"
