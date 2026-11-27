@@ -4,46 +4,63 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+export type SkillSyncManifest = {
+  schema: 'haichi-skill-sync/v1';
+  owner: string;
+  skill: string;
+  source: string;
+  destination: string;
+  managed_files: string[];
+  repositories: string[];
+};
+
+export type SyncStatus =
+  | 'up_to_date' | 'pr_current' | 'pr_created' | 'pr_updated'
+  | 'would_open_pr' | 'would_update_pr' | 'would_create_pr';
+
+export type SyncResult = { repo: string; status: SyncStatus; number?: number };
+
 const BRANCH_PREFIX = 'haichi-skill-sync/';
 const MESSAGE_PREFIX = 'chore(skill-sync): update ';
 const SAFE_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
 const SAFE_SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
 
-function assert(condition, message) {
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-export function validateManifest(raw) {
+export function validateManifest(raw: unknown): SkillSyncManifest {
   assert(raw && typeof raw === 'object' && !Array.isArray(raw), 'Invalid manifest');
-  assert(raw.schema === 'haichi-skill-sync/v1', 'Unsupported manifest schema');
-  assert(SAFE_NAME.test(raw.owner ?? ''), 'Invalid owner');
-  assert(SAFE_NAME.test(raw.skill ?? ''), 'Invalid skill');
-  assert(raw.source === `skills/${raw.skill}`, 'Unexpected skill source');
-  assert(raw.destination === `.agents/skills/${raw.skill}`, 'Unexpected skill destination');
-  assert(Array.isArray(raw.managed_files) && raw.managed_files.length > 0, 'No managed files');
-  const files = new Set();
-  for (const path of raw.managed_files) {
+  const value = raw as Record<string, unknown>;
+  assert(value.schema === 'haichi-skill-sync/v1', 'Unsupported manifest schema');
+  assert(typeof value.owner === 'string' && SAFE_NAME.test(value.owner), 'Invalid owner');
+  assert(typeof value.skill === 'string' && SAFE_NAME.test(value.skill), 'Invalid skill');
+  assert(value.source === `skills/${value.skill}`, 'Unexpected skill source');
+  assert(value.destination === `.agents/skills/${value.skill}`, 'Unexpected skill destination');
+  assert(Array.isArray(value.managed_files) && value.managed_files.length > 0, 'No managed files');
+  const files = new Set<string>();
+  for (const path of value.managed_files) {
     assert(typeof path === 'string' && path.split('/').every(part => SAFE_SEGMENT.test(part) && part !== '..'), `Invalid file: ${path}`);
     assert(!files.has(path), `Duplicate managed file: ${path}`);
     files.add(path);
   }
   assert(files.has('SKILL.md'), 'SKILL.md must be managed');
-  assert(Array.isArray(raw.repositories) && raw.repositories.length > 0, 'No opted-in repositories');
-  const repos = new Set();
-  for (const fullName of raw.repositories) {
+  assert(Array.isArray(value.repositories) && value.repositories.length > 0, 'No opted-in repositories');
+  const repos = new Set<string>();
+  for (const fullName of value.repositories) {
     assert(typeof fullName === 'string', 'Invalid repository name');
     const [owner, name, extra] = fullName.split('/');
-    assert(!extra && owner === raw.owner && SAFE_NAME.test(name) && name !== '.github', `Out-of-scope repository: ${fullName}`);
+    assert(!extra && owner === value.owner && SAFE_NAME.test(name) && name !== '.github', `Out-of-scope repository: ${fullName}`);
     assert(!repos.has(fullName), `Duplicate repository: ${fullName}`);
     repos.add(fullName);
   }
-  return raw;
+  return value as SkillSyncManifest;
 }
 
-export async function loadConfig(root = process.cwd()) {
+export async function loadConfig(root = process.cwd()): Promise<{ manifest: SkillSyncManifest; content: Map<string, string> }> {
   const value = JSON.parse(await readFile(resolve(root, '.github/skill-sync.json'), 'utf8'));
   const manifest = validateManifest(value);
-  const content = new Map();
+  const content = new Map<string, string>();
   for (const file of manifest.managed_files) {
     const body = await readFile(resolve(root, manifest.source, file), 'utf8');
     assert(body.length > 0, `Empty canonical file: ${file}`);
@@ -53,12 +70,14 @@ export async function loadConfig(root = process.cwd()) {
 }
 
 export class Api {
-  constructor(token, fetcher = fetch) {
+  readonly token: string;
+  readonly fetcher: typeof fetch;
+  constructor(token: string, fetcher: typeof fetch = fetch) {
     assert(typeof token === 'string' && token.length > 0, 'GH_TOKEN is required');
     this.token = token;
     this.fetcher = fetcher;
   }
-  async call(method, path, body, allow404 = false) {
+  async call(method: string, path: string, body?: unknown, allow404 = false): Promise<any> {
     const resp = await this.fetcher(`https://api.github.com${path}`, {
       method,
       headers: {
@@ -77,33 +96,33 @@ export class Api {
   }
 }
 
-function assertSafeBranch(branch) {
+function assertSafeBranch(branch: string) {
   assert(/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(branch) && !branch.includes('..'), 'Unsafe branch name');
 }
 
-async function getContents(api, repo, path, ref) {
+async function getContents(api: Api, repo: string, path: string, ref: string): Promise<string | null> {
   const result = await api.call('GET', `/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`, undefined, true);
   if (!result) return null;
   assert(result.type === 'file' && result.encoding === 'base64' && typeof result.content === 'string', `Unmanaged or unreadable file: ${repo}/${path}`);
   return Buffer.from(result.content.replace(/\s/g, ''), 'base64').toString('utf8');
 }
 
-async function readManaged(api, repo, paths, ref) {
-  const result = new Map();
+async function readManaged(api: Api, repo: string, paths: Set<string>, ref: string): Promise<Map<string, string | null>> {
+  const result = new Map<string, string | null>();
   for (const path of paths) result.set(path, await getContents(api, repo, path, ref));
   return result;
 }
 
-export function isIdentical(expected, observed) {
+export function isIdentical(expected: ReadonlyMap<string, string>, observed: ReadonlyMap<string, string | null>) {
   return [...expected].every(([name, body]) => observed.get(name) === body);
 }
 
-function pullHead(pr, branch, owner) {
+function pullHead(pr: any, branch: string, owner: string) {
   return pr.head?.ref === branch && pr.head?.repo?.owner?.login?.toLowerCase() === owner.toLowerCase();
 }
 
 // Refuse to overwrite any branch with unrelated changes or an unknown last commit.
-async function verifyManagedBranch(api, repo, base, branch, sha, managed) {
+async function verifyManagedBranch(api: Api, repo: string, base: string, branch: string, sha: string, managed: ReadonlySet<string>) {
   const commit = await api.call('GET', `/repos/${repo}/git/commits/${sha}`);
   assert(commit.message?.startsWith(MESSAGE_PREFIX), `${repo}: branch has a non-sync commit; manual review required`);
   const compare = await api.call('GET', `/repos/${repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(branch)}`);
@@ -113,7 +132,7 @@ async function verifyManagedBranch(api, repo, base, branch, sha, managed) {
   }
 }
 
-export async function syncRepository(api, repo, manifest, expected, dryRun = false) {
+export async function syncRepository(api: Api, repo: string, manifest: SkillSyncManifest, expected: ReadonlyMap<string, string>, dryRun = false): Promise<SyncResult> {
   const meta = await api.call('GET', `/repos/${repo}`);
   assert(meta.full_name === repo && meta.owner?.login === manifest.owner && !meta.archived && !meta.disabled, `${repo}: repository identity or state mismatch`);
   assert(typeof meta.default_branch === 'string' && meta.default_branch.length, `${repo}: missing default branch`);
@@ -186,14 +205,14 @@ export async function syncRepository(api, repo, manifest, expected, dryRun = fal
   return { repo, status: 'pr_created', number: created.number };
 }
 
-async function main() {
+async function main(): Promise<void> {
   const { manifest, content } = await loadConfig();
   if (process.argv.includes('--list-repositories')) {
     process.stdout.write(manifest.repositories.map(repo => repo.split('/')[1]).join(',') + '\n');
     return;
   }
   assert(process.argv.every(arg => !arg.startsWith('--') || arg === '--dry-run'), 'Unknown argument');
-  const api = new Api(process.env.GH_TOKEN);
+  const api = new Api(process.env.GH_TOKEN ?? '');
   const dryRun = process.argv.includes('--dry-run');
   for (const repo of manifest.repositories) {
     const result = await syncRepository(api, repo, manifest, content, dryRun);

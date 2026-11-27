@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import test from 'node:test';
-import { Api, isIdentical, loadConfig, syncRepository, validateManifest } from './skill-sync.mjs';
+import { Api, isIdentical, loadConfig, syncRepository, validateManifest } from './skill-sync.ts';
 
 const manifest = validateManifest({
   schema: 'haichi-skill-sync/v1', owner: 'haichi-co', skill: 'issue-lifecycle',
@@ -12,11 +12,15 @@ const wanted = new Map([
   ['.agents/skills/issue-lifecycle/references/task-readiness.md', 'readiness v1\n'],
 ]);
 
-function fakeRepository(baseContent = new Map()) {
+function fakeRepository(baseContent: Map<string, string> = new Map()) {
   const baseSha = 'a'.repeat(40), branchSHA = 'b'.repeat(40), nextSHA = 'c'.repeat(40), treeSha = 'd'.repeat(40);
-  const state = { main: new Map(baseContent), branch: null, branchSha: null, prs: [], writes: [], tampered: false, staged: null };
+  const state: {
+    main: Map<string, string>; branch: Map<string, string> | null; branchSha: string | null;
+    prs: any[]; writes: any[]; tampered: boolean; staged: Map<string, string> | null;
+    unrelated?: boolean;
+  } = { main: new Map(baseContent), branch: null, branchSha: null, prs: [], writes: [], tampered: false, staged: null };
   const api = {
-    async call(method, path, body) {
+    async call(method: string, path: string, body?: any): Promise<any> {
       if (method !== 'GET') state.writes.push({ method, path, body });
       if (method === 'GET' && path === '/repos/haichi-co/gharp')
         return { full_name: 'haichi-co/gharp', owner: { login: 'haichi-co' }, archived: false, default_branch: 'main' };
@@ -36,7 +40,7 @@ function fakeRepository(baseContent = new Map()) {
         return { tree: { sha: treeSha }, message: sha === baseSha ? 'main commit' : (state.tampered ? 'manual edit' : 'chore(skill-sync): update issue-lifecycle') };
       }
       if (method === 'GET' && path.includes('/compare/')) {
-        const files = [...state.branch.keys()].filter(k => state.main.get(k) !== state.branch.get(k))
+        const files = [...state.branch!.keys()].filter(k => state.main.get(k) !== state.branch!.get(k))
           .map(filename => ({ filename, status: 'modified' }));
         if (state.unrelated) files.push({ filename: 'AGENTS.md', status: 'modified' });
         return { files };
@@ -87,18 +91,18 @@ test('content comparison uses exact managed file equality', () => {
 
 test('already synchronized main is a read-only no-op', async () => {
   const { api, state } = fakeRepository(wanted);
-  assert.deepEqual(await syncRepository(api, 'haichi-co/gharp', manifest, wanted), { repo: 'haichi-co/gharp', status: 'up_to_date' });
+  assert.deepEqual(await syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, wanted), { repo: 'haichi-co/gharp', status: 'up_to_date' });
   assert.equal(state.writes.length, 0);
 });
 
 test('first sync creates a single PR; a second run makes zero writes', async () => {
   const { api, state } = fakeRepository();
-  const first = await syncRepository(api, 'haichi-co/gharp', manifest, wanted);
+  const first = await syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, wanted);
   assert.equal(first.status, 'pr_created');
   assert.equal(state.prs.length, 1);
-  assert.equal(state.branch.get('.agents/skills/issue-lifecycle/SKILL.md'), 'skill v1\n');
+  assert.equal(state.branch!.get('.agents/skills/issue-lifecycle/SKILL.md'), 'skill v1\n');
   const before = state.writes.length;
-  const second = await syncRepository(api, 'haichi-co/gharp', manifest, wanted);
+  const second = await syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, wanted);
   assert.equal(second.status, 'pr_current');
   assert.equal(second.number, first.number);
   assert.equal(state.writes.length, before);
@@ -106,24 +110,24 @@ test('first sync creates a single PR; a second run makes zero writes', async () 
 
 test('changed canonical content updates the same PR and then stabilizes', async () => {
   const { api, state } = fakeRepository();
-  await syncRepository(api, 'haichi-co/gharp', manifest, wanted);
+  await syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, wanted);
   const revised = new Map(wanted); revised.set('.agents/skills/issue-lifecycle/SKILL.md', 'skill v2\n');
   const before = state.writes.length;
-  const result = await syncRepository(api, 'haichi-co/gharp', manifest, revised);
+  const result = await syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, revised);
   assert.equal(result.status, 'pr_updated');
   assert.equal(state.prs.length, 1);
   assert.equal(state.writes.slice(before).filter(x => x.method === 'POST' && x.path.endsWith('/pulls')).length, 0);
   const after = state.writes.length;
-  assert.equal((await syncRepository(api, 'haichi-co/gharp', manifest, revised)).status, 'pr_current');
+  assert.equal((await syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, revised)).status, 'pr_current');
   assert.equal(state.writes.length, after);
 });
 
 test('orphaned owned branch can be converted into a PR without a new commit', async () => {
   const { api, state } = fakeRepository();
-  await syncRepository(api, 'haichi-co/gharp', manifest, wanted);
+  await syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, wanted);
   state.prs = []; // Simulates a failure between pushing and creating the PR.
   const before = state.writes.length;
-  const result = await syncRepository(api, 'haichi-co/gharp', manifest, wanted);
+  const result = await syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, wanted);
   assert.equal(result.status, 'pr_created');
   assert.equal(state.writes.length, before + 1);
   assert.equal(state.prs.length, 1);
@@ -131,22 +135,22 @@ test('orphaned owned branch can be converted into a PR without a new commit', as
 
 test('dry run never writes or creates PRs', async () => {
   const { api, state } = fakeRepository();
-  const result = await syncRepository(api, 'haichi-co/gharp', manifest, wanted, true);
+  const result = await syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, wanted, true);
   assert.equal(result.status, 'would_create_pr');
   assert.equal(state.writes.length, 0);
 });
 
 test('unrelated or hand-edited sync branches fail closed', async () => {
   const { api, state } = fakeRepository();
-  await syncRepository(api, 'haichi-co/gharp', manifest, wanted);
+  await syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, wanted);
   const changed = new Map(wanted); changed.set('.agents/skills/issue-lifecycle/SKILL.md', 'new\n');
   state.unrelated = true;
   const before = state.writes.length;
-  await assert.rejects(syncRepository(api, 'haichi-co/gharp', manifest, changed), /unexpected branch change/);
+  await assert.rejects(syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, changed), /unexpected branch change/);
   assert.equal(state.writes.length, before);
   state.unrelated = false;
   state.tampered = true;
-  await assert.rejects(syncRepository(api, 'haichi-co/gharp', manifest, changed), /non-sync commit/);
+  await assert.rejects(syncRepository(api as unknown as Api, 'haichi-co/gharp', manifest, changed), /non-sync commit/);
   assert.equal(state.writes.length, before);
 });
 
@@ -158,7 +162,7 @@ test('loadConfig reads the canonical on-disk files', async () => {
 });
 
 test('API returns missing resources as null without swallowing other errors', async () => {
-  const api = new Api('test', async () => ({ status: 404, ok: false, text: async () => 'not found' }));
+  const api = new Api('test', (async () => ({ status: 404, ok: false, text: async () => 'not found' })) as unknown as typeof fetch);
   assert.equal(await api.call('GET', '/nothing', undefined, true), null);
   await assert.rejects(api.call('GET', '/nothing'), /HTTP 404/);
 });

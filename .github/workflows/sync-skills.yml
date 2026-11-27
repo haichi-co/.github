@@ -6,8 +6,8 @@ on:
     paths:
       - 'skills/issue-lifecycle/**'
       - '.github/skill-sync.json'
-      - 'src/skill-sync.mjs'
-      - 'src/skill-sync.test.mjs'
+      - 'src/skill-sync.ts'
+      - 'src/skill-sync.test.ts'
       - '.github/workflows/sync-skills.yml'
   schedule:
     - cron: '19 5 * * *'
@@ -44,9 +44,8 @@ jobs:
 
       - name: Validate manifest and sync engine
         run: |
-          node --check src/skill-sync.mjs
-          node --test src/skill-sync.test.mjs
-          node src/skill-sync.mjs --list-repositories
+          node --test src/skill-sync.test.ts
+          node src/skill-sync.ts --list-repositories
 
   sync:
     needs: verify
@@ -70,7 +69,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          printf 'repositories=%s\n' "$(node src/skill-sync.mjs --list-repositories)" >> "$GITHUB_OUTPUT"
+          printf 'repositories=%s\n' "$(node src/skill-sync.ts --list-repositories)" >> "$GITHUB_OUTPUT"
 
       - name: Mint repository-scoped GitHub App token
         id: app-token
@@ -91,7 +90,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$DRY_RUN" == true ]]; then
-            node src/skill-sync.mjs --dry-run
+            node src/skill-sync.ts --dry-run
           else
-            node src/skill-sync.mjs
+            node src/skill-sync.ts
           fi
