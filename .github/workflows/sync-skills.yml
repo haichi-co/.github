@@ -8,6 +8,7 @@ on:
       - '.github/skill-sync.json'
       - 'src/skill-sync.ts'
       - 'src/skill-sync.test.ts'
+      - 'tsconfig.json'
       - '.github/workflows/sync-skills.yml'
   schedule:
     - cron: '19 5 * * *'
@@ -41,6 +42,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+
+      - name: Install pinned type-check tools
+        run: npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund typescript@5.9.3 @types/node@24.10.13 undici-types@7.16.0
+
+      - name: Type-check TypeScript (no emit)
+        run: ./node_modules/.bin/tsc --noEmit --project tsconfig.json
 
       - name: Validate manifest and sync engine
         run: |
