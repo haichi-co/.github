@@ -1,0 +1,33 @@
+name: Decision
+description: Record a choice that must be resolved and its rationale.
+type: Decision
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Decision to make
+      description: State the concrete question or choice to resolve.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and constraints
+      description: What requirements, evidence, and constraints affect the decision?
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options and trade-offs
+      description: Describe alternatives and material pros or cons, if known.
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: Recommendation
+      description: State a single recommended option if one is ready for approval.
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences and dependent work
+      description: Note implications and work blocked by this decision.
