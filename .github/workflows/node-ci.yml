@@ -1,0 +1,42 @@
+# Called by the Node 24 CI starter workflow in consuming repositories.
+name: Reusable Node CI
+
+on:
+  workflow_call:
+    inputs:
+      runners:
+        description: JSON string with runner labels or hosted runner name.
+        type: string
+        required: false
+        default: '["self-hosted","linux"]'
+      checkout_sha:
+        description: Original commit SHA for hosted fallback runs.
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Validate and test
+    runs-on: ${{ fromJSON(inputs.runners) }}
+    timeout-minutes: 30
+    env:
+      NPM_CONFIG_MIN_RELEASE_AGE: '7'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify npm release-age guard
+        shell: bash
+        run: test "$(npm config get min-release-age)" = '7'
+      - run: npm ci
+      - run: npm run check --if-present
+      - run: npm test --if-present
