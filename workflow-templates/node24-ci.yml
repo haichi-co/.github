@@ -1,0 +1,139 @@
+# Organization workflow template. Copy into .github/workflows/ in an npm repository.
+# Important: workflow_dispatch fallback runs do not satisfy required pull_request checks.
+name: Node 24 CI
+run-name: ${{ github.event_name == 'workflow_dispatch' && inputs.source_run_id != '' && format('CI fallback for run {0}', inputs.source_run_id) || 'Node 24 CI' }}
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner for manual execution
+        type: choice
+        required: true
+        default: self-hosted
+        options:
+          - self-hosted
+          - github-hosted
+      source_run_id:
+        description: Original run ID (populated by the watchdog)
+        type: string
+        required: false
+      source_sha:
+        description: Exact commit to validate (populated by the watchdog)
+        type: string
+        required: false
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Validate and test
+    if: github.event_name != 'schedule'
+    # Fork PRs use hosted runners to avoid executing untrusted forks on persistent hosts.
+    # Override the default runner using a repository variable such as '"ubuntu-latest"'.
+    runs-on: ${{ fromJSON((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository || github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted') && '"ubuntu-latest"' || (vars.CI_RUNNERS || '["self-hosted","linux"]')) }}
+    timeout-minutes: 30
+    env:
+      NPM_CONFIG_MIN_RELEASE_AGE: '7'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify npm release-age guard
+        run: test "$(npm config get min-release-age)" = '7'
+      - run: npm ci
+      - run: npm run check --if-present
+      - run: npm test --if-present
+
+  watchdog:
+    name: Self-hosted queue watchdog
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    concurrency:
+      group: node24-ci-queue-watchdog
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Fall back after 30 minutes without a runner
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          repo="$GITHUB_REPOSITORY"
+          workflow="${GITHUB_WORKFLOW_REF%%@*}"
+          workflow="${workflow##*/}"
+          cutoff="$(( $(date -u +%s) - 30 * 60 ))"
+          active='[]'
+
+          for status in queued in_progress; do
+            response="$(gh api "repos/$repo/actions/workflows/$workflow/runs?status=$status&per_page=100")"
+            active="$(jq -cn --argjson lhs "$active" --argjson rhs "$(jq '.workflow_runs' <<< "$response")" '$lhs + $rhs')"
+          done
+
+          while IFS= read -r run; do
+            run_id="$(jq -r '.id' <<< "$run")"
+            head_sha="$(jq -r '.head_sha' <<< "$run")"
+            if [[ ! "$head_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Skip run $run_id: missing valid commit SHA"
+              continue
+            fi
+
+            jobs="$(gh api "repos/$repo/actions/runs/$run_id/jobs?filter=latest&per_page=100")"
+            # Never cancel a job that has started, awaits approval, or uses hosted runners.
+            if ! jq -e --argjson cutoff "$cutoff" '
+                [.jobs[] | select(.name == "Validate and test")] as $matches
+                | ($matches | length) == 1
+                  and $matches[0].status == "queued"
+                  and $matches[0].started_at == null
+                  and ($matches[0].created_at | fromdateiso8601) <= $cutoff
+                  and (($matches[0].labels | map(ascii_downcase)) | index("self-hosted") != null)
+                  and (($matches[0].labels | map(ascii_downcase)) | index("linux") != null)
+              ' <<< "$jobs" > /dev/null; then
+              continue
+            fi
+
+            # A previous dispatch can still be invisible in the original run status.
+            existing="$(gh api "repos/$repo/actions/workflows/$workflow/runs?event=workflow_dispatch&per_page=100" \
+              --jq '.workflow_runs[].display_title')"
+            if grep -Fqx "CI fallback for run $run_id" <<< "$existing"; then
+              echo "Fallback already exists for $run_id"
+              continue
+            fi
+
+            # Recheck the individual job immediately before canceling, reducing races.
+            job_id="$(jq -r '.jobs[] | select(.name == "Validate and test") | .id' <<< "$jobs")"
+            job_now="$(gh api "repos/$repo/actions/jobs/$job_id")"
+            if [[ "$(jq -r '.status' <<< "$job_now")" != queued ]]; then
+              echo "Skip run $run_id: job no longer queued"
+              continue
+            fi
+
+            echo "Cancel queued run $run_id and request hosted fallback for $head_sha"
+            gh api --method POST "repos/$repo/actions/runs/$run_id/cancel" > /dev/null
+            jq -cn \
+              --arg ref "$GITHUB_REF_NAME" \
+              --arg id "$run_id" \
+              --arg sha "$head_sha" \
+              '{ref:$ref,inputs:{runner:"github-hosted",source_run_id:$id,source_sha:$sha}}' \
+              | gh api --method POST "repos/$repo/actions/workflows/$workflow/dispatches" --input - > /dev/null
+          done < <(jq -c --argjson cutoff "$cutoff" '
+            .[]
+            | select(.event == "push" or .event == "pull_request")
+            | select((.created_at | fromdateiso8601) <= $cutoff)
+          ' <<< "$active")
