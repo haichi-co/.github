@@ -4,7 +4,7 @@ title: "Repository bootstrap"
 description: "Organization repository onboarding guidance and the opt-in ignore-file scaffold."
 sources:
   - resource: "https://github.com/haichi-co/.github/blob/main/README.md"
-    x-haichi-git-blob: "cfab94d329d39e84a1b7ac3d3116ae330277ff4e"
+    x-haichi-git-blob: "ab33c40dfe819639cee97736283711a211dc9f5f"
   - resource: "https://github.com/haichi-co/.github/blob/main/templates/base.gitignore"
     x-haichi-git-blob: "62c28e7f5586361047d5638a6c7f3882d28e6a37"
 ---
@@ -21,3 +21,5 @@ For adopting shared GitHub resources, consult the [canonical repository README](
 - Shared OKF knowledge is centrally maintained and opt-in through a consumer-owned [index link](https://github.com/haichi-co/.github/blob/main/knowledge/index.md). Moving `main` is the default; an exact commit SHA is optional for a historical snapshot. Remove the pointer to opt out. Reading shared knowledge requires no consumer OKF layout, validator, enrollment, App credentials or copied concepts; actual skill files and required relative dependencies remain independently managed via skill sync. Consumer-local requirements and canonical source authority are unchanged.
 - Managed external Action dependencies are pinned to verified full commit SHAs. The README documents deliberate review, updates, rollback and per-surface version policy: consumer commits for copied templates and merged skill sync PRs, current main or exact commit snapshots for knowledge, and conditional future reusable-workflow compatibility tags. No repository-wide semantic release is required.
 - Central-main review and integrity policy is documented in the README and [Main protection](main-protection.md); it is specific to the shared repository and not an inherited consumer default.
+
+- Central skill synchronization uses the owner-reviewed main policy and a separately configured main-only credential environment; refer to [Skill synchronization](skill-sync.md) for the authorization rationale, staged migration and recovery requirements. Source policy alone does not establish live credential isolation.
