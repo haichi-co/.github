@@ -2,8 +2,8 @@ name: Validate OKF knowledge
 
 on:
   pull_request:
-    paths-ignore:
-      - 'profile/**'
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
     paths-ignore:

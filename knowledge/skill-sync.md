@@ -6,7 +6,7 @@ sources:
   - resource: "https://github.com/haichi-co/.github/blob/main/.github/skill-sync.json"
     x-haichi-git-blob: "1022fc244b29fc3bdc29b72746d16094a597fec8"
   - resource: "https://github.com/haichi-co/.github/blob/main/.github/workflows/sync-skills.yml"
-    x-haichi-git-blob: "903821b038d93d32fbcbbb0b3fb0cd2013151b71"
+    x-haichi-git-blob: "cdc236a3c1ca97bb360c5512304b34e521f6edb8"
   - resource: "https://github.com/haichi-co/.github/blob/main/src/skill-sync.ts"
     x-haichi-git-blob: "60137a83a934dbc8d44e90f51405de3e4f8796a9"
   - resource: "https://github.com/haichi-co/.github/blob/main/src/skill-sync.test.ts"
@@ -26,3 +26,4 @@ For centrally managed, opt-in skill distribution, consult the [canonical manifes
 - Synchronization creates or updates one reviewable PR per repository-skill pair, never auto-merges, and makes no writes when the default branch or pending PR already matches. Unexpected branch changes fail closed; only manifest-managed files are changed, without executing target code or modifying repository-specific agent instructions, unrelated skills or workflows.
 - Removing a topic stops updates for that skill without deleting its existing files or affecting other enrollments. When enabled, the hosted workflow reconciles on relevant main updates, daily at 05:19 UTC, or on manual dispatch, which defaults to a dry run.
 - All external Actions used by synchronization and verification, including the App-token action, are pinned to verified full upstream commit SHAs and release comments. Dependency updates follow the reviewed procedure in the root README; token scope and enrollment semantics are unchanged.
+- The credential-free `verify` check runs for every PR targeting central `main`; the `sync` job does not run on PRs. PR verification has a separate concurrency group per PR, without entering the writer queue. Main push, schedule and manual-dispatch sync behavior is unchanged.

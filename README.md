@@ -33,6 +33,21 @@ The repository does not have a unified release version. Copied workflow template
 
 Execution stops after one verified unit by default, or continues sequentially within an explicitly authorized issue scope (and beyond it only when expressly requested). This skill is **opt-in**: files under `skills/` are not inherited automatically by other GitHub repositories or agent hosts.
 
+## Central main protection
+
+[Decision #38](https://github.com/haichi-co/.github/issues/38) requires personal owner review in this central repository. [CODEOWNERS](.github/CODEOWNERS) designates `dddominikk` for every path, and [AGENTS.md](AGENTS.md) defines the agent operating boundary. The owner retains Admin; `agent-hachi` has a non-admin repository role (Maintain) here, independently of its role in other repositories. Agents open PRs and may merge as themselves only after the owner personally approves the current head and the required checks pass. Agent reviews are evidence, not the owner's approval. Agents must not approve, merge or bypass using the owner's credentials.
+
+The desired main protection is versioned as two independent branch rulesets:
+
+- [main-owner-review](.github/rulesets/main.json): one approving code-owner review; new reviewable commits dismiss stale approvals. Only the exact owner account (user ID 47727604) has PR-only bypass, reserved for the owner's own PR when self-approval is unavailable. The owner uses that bypass personally, only after CI passes.
+- [main-integrity](.github/rulesets/main-integrity.json): no bypass actors; requires a PR, passing `verify` and `validate-okf` from GitHub Actions (integration ID 15368) on the latest base, and blocks force pushes and branch deletion. Both rulesets match exactly `refs/heads/main`. The review bypass cannot bypass integrity.
+
+Both checks report on every PR targeting `main`, including profile-only or documentation-only changes and PRs retargeted to main. `verify` checks the skill-sync code/manifest without minting App tokens in PRs; `validate-okf` checks the knowledge, source pins and workflow pins. The reusable `node-ci.yml` is not a native check in this repository. Read-only PR verification is isolated by PR from the existing shared writer queue, so one PR cannot cancel a pending sync or another PR check. Push/schedule/dispatch filters and synchronization behavior are unchanged.
+
+The JSON files describe desired state; committing them does not activate GitHub rulesets. After the governance PR is personally approved and merged, verify both check contexts on a benign profile-only PR. With separate owner authorization, an administrator applies the exact reviewed JSON from `.github/rulesets/` using the repository ruleset API or import UI (review rule **and** integrity rule). First inspect existing rulesets/roles, stop on unexpected configuration, and do not broaden the bypass if GitHub rejects the exact User actor. Read back both active definitions and effective rules for `main`, confirm the machine user has no bypass or rule administration, then verify an agent-authored green PR without personal owner review cannot merge. Do not attempt destructive push/deletion tests. Record evidence in [#37](https://github.com/haichi-co/.github/issues/37). Ruleset edits, disabling, or rollback require separately authorized owner action; never remove protection to unblock a PR.
+
+This is a central-main and review boundary, not full credential isolation. Repository writers can access repository-scoped Actions secrets through workflows until the skill-sync environment migration in [#39](https://github.com/haichi-co/.github/issues/39) is verified. The policy cannot protect against a compromised owner or previously exposed credentials. Do not copy these owner-specific rulesets into other repositories unchanged.
+
 ## Agent skill synchronization
 
 The canonical [issue-lifecycle skill](skills/issue-lifecycle/SKILL.md) and its task-readiness reference can be distributed through [Sync organization agent skills](.github/workflows/sync-skills.yml). The [v3 manifest](.github/skill-sync.json) has an organization owner and a `skills` array. The existing issue-lifecycle enrollment topic (`haichi-skill-issue-lifecycle`), managed files, and branch are unchanged from v2.
