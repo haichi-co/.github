@@ -1,0 +1,26 @@
+{
+  "enabled": false,
+  "apply_enabled": false,
+  "organization": {
+    "login": "haichi-co",
+    "id": 323858746
+  },
+  "central_repository": {
+    "name": ".github",
+    "id": 1450944462
+  },
+  "owner": {
+    "login": "dddominikk",
+    "id": 47727604
+  },
+  "machine": {
+    "login": "agent-hachi",
+    "id": 320293568
+  },
+  "expected_base_permission": "write",
+  "app": {
+    "client_id": null,
+    "id": null,
+    "installation_id": null
+  }
+}

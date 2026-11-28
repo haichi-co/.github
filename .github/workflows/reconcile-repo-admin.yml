@@ -1,0 +1,63 @@
+name: Reconcile machine-user repository Admin
+
+# Schedule is intentionally absent until owner-authorized live apply proof.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Inventory and plan without minting any repository Admin token
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-admin-reconcile
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      authorized: ${{ steps.policy.outputs.authorized }}
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Authorize exact deployment and current main
+        id: policy
+        env:
+          READ_TOKEN: ${{ github.token }}
+          RECONCILE_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        run: node src/repo-admin-reconcile.ts --authorize
+
+  reconcile:
+    needs: authorize
+    if: needs.authorize.outputs.authorized == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    environment: repo-admin-reconcile
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Validate and reconcile eligible repository permissions
+        env:
+          READ_TOKEN: ${{ github.token }}
+          RECONCILE_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          REPO_ADMIN_RECONCILE_PRIVATE_KEY: ${{ secrets.REPO_ADMIN_RECONCILE_PRIVATE_KEY }}
+        run: node src/repo-admin-reconcile.ts --run
