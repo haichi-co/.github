@@ -12,7 +12,7 @@ sources:
   - resource: "https://github.com/haichi-co/.github/blob/main/src/skill-sync.test.ts"
     x-haichi-git-blob: "f7a33972efa1c85bd680d2565e91b2fca234711e"
   - resource: "https://github.com/haichi-co/.github/blob/main/.github/skill-sync-policy.json"
-    x-haichi-git-blob: "33156a5a49f3a126ec8a302819872230c53547f1"
+    x-haichi-git-blob: "da937054a975201e098a07a15f5e8d44222c0d7c"
   - resource: "https://github.com/haichi-co/.github/blob/main/src/skill-sync-policy.ts"
     x-haichi-git-blob: "86e538730ef98e1c780e1bf6347e23d8c196169a"
   - resource: "https://github.com/haichi-co/.github/blob/main/src/skill-sync-policy.test.ts"

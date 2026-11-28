@@ -1,5 +1,5 @@
 {
   "enabled": true,
-  "dry_run_only": true,
+  "dry_run_only": false,
   "app_client_id": "Iv23liFpJpDs04WgFLSs"
 }
