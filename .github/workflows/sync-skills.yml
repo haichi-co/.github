@@ -2,13 +2,8 @@ name: Sync organization agent skills
 
 on:
   pull_request:
-    paths:
-      - 'skills/**'
-      - '.github/skill-sync.json'
-      - 'src/skill-sync.ts'
-      - 'src/skill-sync.test.ts'
-      - 'tsconfig.json'
-      - '.github/workflows/sync-skills.yml'
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
     paths:
@@ -32,7 +27,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: haichi-skill-sync
+  # Read-only PR checks must not cancel pending writer runs or other PRs.
+  group: ${{ github.event_name == 'pull_request' && format('haichi-skill-sync-pr-{0}', github.ref) || 'haichi-skill-sync' }}
   cancel-in-progress: false
 
 jobs:

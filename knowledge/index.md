@@ -11,3 +11,4 @@ description: "Public bootstrap resources for Haichi GitHub repositories."
 - [Skill synchronization](skill-sync.md) - Canonical skill-sync manifest, workflow, implementation, and regression checks.
 - [Repository bootstrap](repository-bootstrap.md) - Organization repository onboarding guidance and the opt-in ignore-file scaffold.
 - [Security reporting](security-reporting.md) - Canonical public vulnerability-reporting policy.
+- [Central main protection](main-protection.md) - Owner review and integrity policy for the central bootstrap repository.
