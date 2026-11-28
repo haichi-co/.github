@@ -4,7 +4,7 @@ title: "Repository bootstrap"
 description: "Organization repository onboarding guidance and the opt-in ignore-file scaffold."
 sources:
   - resource: "https://github.com/haichi-co/.github/blob/main/README.md"
-    x-haichi-git-blob: "681810b0d80b7a48d3e814cba6052dc790558ef0"
+    x-haichi-git-blob: "c14b1b369934e40f2eb7f983c589a0ca6edc8e44"
   - resource: "https://github.com/haichi-co/.github/blob/main/templates/base.gitignore"
     x-haichi-git-blob: "62c28e7f5586361047d5638a6c7f3882d28e6a37"
 ---
@@ -23,3 +23,4 @@ For adopting shared GitHub resources, consult the [canonical repository README](
 - Central-main review and integrity policy is documented in the README and [Main protection](main-protection.md); it is specific to the shared repository and not an inherited consumer default.
 
 - Central skill synchronization uses the owner-reviewed main policy and a separately configured main-only credential environment; refer to [Skill synchronization](skill-sync.md) for the authorization rationale, staged migration and recovery requirements. Source policy alone does not establish live credential isolation.
+- [Machine-user repository Admin reconciliation](repository-admin-reconciliation.md) keeps the machine user Admin on eligible repos except central. Deployment binds local reviewed IDs and an owner-controlled environment/App; copied source is not live configuration. See that concept for the bootstrap portability and credential-isolation decisions.

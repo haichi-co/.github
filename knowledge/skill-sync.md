@@ -6,7 +6,7 @@ sources:
   - resource: "https://github.com/haichi-co/.github/blob/main/.github/skill-sync.json"
     x-haichi-git-blob: "1022fc244b29fc3bdc29b72746d16094a597fec8"
   - resource: "https://github.com/haichi-co/.github/blob/main/.github/workflows/sync-skills.yml"
-    x-haichi-git-blob: "620d56d1b486e762d1fc72e85a90304f85e45085"
+    x-haichi-git-blob: "59c80094c18f767e105e6b7107b1bc70f35cd9be"
   - resource: "https://github.com/haichi-co/.github/blob/main/src/skill-sync.ts"
     x-haichi-git-blob: "60137a83a934dbc8d44e90f51405de3e4f8796a9"
   - resource: "https://github.com/haichi-co/.github/blob/main/src/skill-sync.test.ts"
@@ -32,7 +32,7 @@ For centrally managed, opt-in skill distribution, consult the [canonical manifes
 - Synchronization creates or updates one reviewable PR per repository-skill pair, never auto-merges, and makes no writes when the default branch or pending PR already matches. Unexpected branch changes fail closed; only manifest-managed files are changed, without executing target code or modifying repository-specific agent instructions, unrelated skills or workflows.
 - Removing a topic stops updates for that skill without deleting its existing files or affecting other enrollments. When enabled, the hosted workflow reconciles on relevant main updates, daily at 05:19 UTC, or on manual dispatch, which defaults to a dry run.
 - All external Actions used by synchronization and verification, including the App-token action, are pinned to verified full upstream commit SHAs and release comments. Dependency updates follow the reviewed procedure in the root README; token scope and enrollment semantics are unchanged.
-- The credential-free `verify` check runs for every PR targeting central `main`; the `sync` job does not run on PRs. PR verification has a separate concurrency group per PR, without entering the writer queue. Push, schedule and manual dispatch are subject to the reviewed authorization policy. Verification runs even when synchronization is disabled.
+- The credential-free `verify` check runs for every PR targeting central `main`; the `sync` job does not run on PRs. PR verification has a separate concurrency group per PR, without entering the writer queue. Push, schedule and manual dispatch are subject to the reviewed authorization policy. Verification runs even when synchronization is disabled. It also validates the separate [repository Admin reconciler](repository-admin-reconciliation.md) and its fixtures without credentials; this does not change skill-sync token scope.
 
 ## Why authorization is separate from credentials
 
