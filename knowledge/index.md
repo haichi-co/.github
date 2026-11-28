@@ -6,7 +6,7 @@ description: "Public bootstrap resources for Haichi GitHub repositories."
 
 # Shared resources
 
-- [Issue lifecycle](issue-lifecycle.md) - Canonical agent skill, task-readiness reference, and GitHub issue forms.
+- [Issue lifecycle](issue-lifecycle.md) - Canonical agent skill, decision and task-readiness references, issue forms, and contract test.
 - [Node 24 CI](node-ci.md) - Shared Node 24 CI workflow and the opt-in starter template.
 - [Skill synchronization](skill-sync.md) - Canonical skill-sync manifest, protected execution policy, credential isolation, workflow, implementation, and regression checks.
 - [Repository bootstrap](repository-bootstrap.md) - Organization repository onboarding guidance and the opt-in ignore-file scaffold.
