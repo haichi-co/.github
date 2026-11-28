@@ -9,8 +9,11 @@ on:
     paths:
       - 'skills/**'
       - '.github/skill-sync.json'
+      - '.github/skill-sync-policy.json'
       - 'src/skill-sync.ts'
       - 'src/skill-sync.test.ts'
+      - 'src/skill-sync-policy.ts'
+      - 'src/skill-sync-policy.test.ts'
       - 'tsconfig.json'
       - '.github/workflows/sync-skills.yml'
   schedule:
@@ -33,7 +36,6 @@ concurrency:
 
 jobs:
   verify:
-    if: github.event_name != 'schedule' || vars.SKILL_SYNC_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -55,13 +57,20 @@ jobs:
 
       - name: Validate manifest and sync engine
         run: |
-          node --test src/skill-sync.test.ts
+          node --test src/skill-sync.test.ts src/skill-sync-policy.test.ts
+          node src/skill-sync-policy.ts --validate-config
           node src/skill-sync.ts --validate-config
 
   sync:
     needs: verify
-    # Remains dormant until a dedicated App is installed and configured.
-    if: vars.SKILL_SYNC_ENABLED == 'true' && github.event_name != 'pull_request'
+    # The environment is separately configured by the owner for branch main only.
+    # Do not use a mutable repository/org variable to authorize synchronization.
+    if: >-
+      github.repository == 'haichi-co/.github' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    environment: skill-sync
+    env:
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -75,17 +84,26 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Authorize reviewed policy and current main
+        id: authorization
+        env:
+          CONFIGURED_APP_CLIENT_ID: ${{ vars.SKILL_SYNC_APP_CLIENT_ID }}
+          READ_TOKEN: ${{ github.token }}
+        run: node src/skill-sync-policy.ts --authorize
+
       - name: Mint read-only organization discovery token
+        if: steps.authorization.outputs.enabled == 'true'
         id: discovery-token
         uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
-          client-id: ${{ vars.SKILL_SYNC_APP_CLIENT_ID }}
+          client-id: ${{ steps.authorization.outputs.client-id }}
           private-key: ${{ secrets.SKILL_SYNC_APP_PRIVATE_KEY }}
           owner: haichi-co
           permission-contents: read
           permission-pull-requests: read
 
       - name: Discover opted-in repositories
+        if: steps.authorization.outputs.enabled == 'true'
         id: targets
         env:
           GH_TOKEN: ${{ steps.discovery-token.outputs.token }}
@@ -100,24 +118,37 @@ jobs:
             echo "No repositories enrolled; skipping write token and synchronization."
           fi
 
+      - name: Recheck authorization before writer token
+        if: steps.authorization.outputs.enabled == 'true' && steps.targets.outputs.repositories != ''
+        env:
+          CONFIGURED_APP_CLIENT_ID: ${{ vars.SKILL_SYNC_APP_CLIENT_ID }}
+          READ_TOKEN: ${{ github.token }}
+        run: node src/skill-sync-policy.ts --assert-authorized
+
       - name: Mint repository-scoped GitHub App token
-        if: steps.targets.outputs.repositories != ''
+        if: steps.authorization.outputs.enabled == 'true' && steps.targets.outputs.repositories != ''
         id: app-token
         uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
-          client-id: ${{ vars.SKILL_SYNC_APP_CLIENT_ID }}
+          client-id: ${{ steps.authorization.outputs.client-id }}
           private-key: ${{ secrets.SKILL_SYNC_APP_PRIVATE_KEY }}
           owner: haichi-co
           repositories: ${{ steps.targets.outputs.repositories }}
           permission-contents: write
           permission-pull-requests: write
 
+      - name: Recheck authorization before synchronization
+        if: steps.authorization.outputs.enabled == 'true' && steps.targets.outputs.repositories != ''
+        env:
+          CONFIGURED_APP_CLIENT_ID: ${{ vars.SKILL_SYNC_APP_CLIENT_ID }}
+          READ_TOKEN: ${{ github.token }}
+        run: node src/skill-sync-policy.ts --assert-authorized
+
       - name: Synchronize managed skill files
-        if: steps.targets.outputs.repositories != ''
+        if: steps.authorization.outputs.enabled == 'true' && steps.targets.outputs.repositories != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SKILL_SYNC_TARGETS: ${{ steps.targets.outputs.targets }}
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
         shell: bash
         run: |
           set -euo pipefail
