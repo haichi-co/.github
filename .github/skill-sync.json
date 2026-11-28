@@ -8,6 +8,7 @@
       "destination": ".agents/skills/issue-lifecycle",
       "managed_files": [
         "SKILL.md",
+        "references/decisions.md",
         "references/task-readiness.md"
       ],
       "opt_in_topic": "haichi-skill-issue-lifecycle"

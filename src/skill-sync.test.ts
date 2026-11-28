@@ -5,7 +5,7 @@ import { Api, discoverTargets, isIdentical, loadConfig, parseDiscoveredTargets, 
 const rawEntry = {
   skill: 'issue-lifecycle',
   source: 'skills/issue-lifecycle', destination: '.agents/skills/issue-lifecycle',
-  managed_files: ['SKILL.md', 'references/task-readiness.md'], opt_in_topic: 'haichi-skill-issue-lifecycle',
+  managed_files: ['SKILL.md', 'references/decisions.md', 'references/task-readiness.md'], opt_in_topic: 'haichi-skill-issue-lifecycle',
 };
 const secondEntry = {
   skill: 'review-helper', source: 'skills/review-helper', destination: '.agents/skills/review-helper',
@@ -17,6 +17,7 @@ const manifest = fullManifest.skills[0];
 const multiManifest = validateManifest(config([rawEntry, secondEntry]));
 const wanted = new Map([
   ['.agents/skills/issue-lifecycle/SKILL.md', 'skill v1\n'],
+  ['.agents/skills/issue-lifecycle/references/decisions.md', 'decisions v1\n'],
   ['.agents/skills/issue-lifecycle/references/task-readiness.md', 'readiness v1\n'],
 ]);
 

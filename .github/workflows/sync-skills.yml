@@ -57,7 +57,7 @@ jobs:
 
       - name: Validate manifest and sync engine
         run: |
-          node --test src/skill-sync.test.ts src/skill-sync-policy.test.ts src/repo-admin-reconcile.test.ts
+          node --test src/skill-sync.test.ts src/skill-sync-policy.test.ts src/repo-admin-reconcile.test.ts src/issue-lifecycle-contract.test.ts
           node src/skill-sync-policy.ts --validate-config
           node src/skill-sync.ts --validate-config
           node src/repo-admin-reconcile.ts --validate-config
