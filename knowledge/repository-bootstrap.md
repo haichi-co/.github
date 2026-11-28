@@ -4,7 +4,7 @@ title: "Repository bootstrap"
 description: "Organization repository onboarding guidance and the opt-in ignore-file scaffold."
 sources:
   - resource: "https://github.com/haichi-co/.github/blob/main/README.md"
-    x-haichi-git-blob: "ab33c40dfe819639cee97736283711a211dc9f5f"
+    x-haichi-git-blob: "681810b0d80b7a48d3e814cba6052dc790558ef0"
   - resource: "https://github.com/haichi-co/.github/blob/main/templates/base.gitignore"
     x-haichi-git-blob: "62c28e7f5586361047d5638a6c7f3882d28e6a37"
 ---
